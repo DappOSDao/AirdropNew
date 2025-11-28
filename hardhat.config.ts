@@ -1,0 +1,27 @@
+import type { HardhatUserConfig } from "hardhat/config";
+import "@nomicfoundation/hardhat-toolbox";
+import * as dotenv from "dotenv";
+
+dotenv.config();
+
+const {
+  ETH_RPC_URL,
+  ARB_RPC_URL,
+  DEPLOYER_PRIVATE_KEY,
+}: NodeJS.ProcessEnv = process.env;
+
+const config: HardhatUserConfig = {
+  solidity: "0.8.28",
+  networks: {
+    eth: {
+      url: ETH_RPC_URL,
+      accounts: DEPLOYER_PRIVATE_KEY ? [DEPLOYER_PRIVATE_KEY] : [],
+    },
+    arb: {
+      url: ARB_RPC_URL,
+      accounts: DEPLOYER_PRIVATE_KEY ? [DEPLOYER_PRIVATE_KEY] : [],
+    },
+  },
+};
+
+export default config;
