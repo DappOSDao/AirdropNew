@@ -3,10 +3,11 @@
 
 import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
 
-
-// npx hardhat ignition deploy ./ignition/modules/Airdrop.ts \
-//   --network $NETWORK \
-//   --parameters '{"AirdropModule":{"tokenAddress":"0x..."}}'
+/**
+npx hardhat ignition deploy ./ignition/modules/Airdrop.ts \
+  --network $NETWORK \
+  --parameters '{"AirdropModule":{"tokenAddress":"0x..."}}'
+*/
 
 /**
  * Hardhat Ignition deployment module for the Airdrop contract.

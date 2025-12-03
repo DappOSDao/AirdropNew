@@ -1,5 +1,6 @@
 import type { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
+import 'hardhat-abi-exporter'
 import * as dotenv from "dotenv";
 
 dotenv.config();
@@ -22,6 +23,11 @@ const config: HardhatUserConfig = {
       accounts: DEPLOYER_PRIVATE_KEY ? [DEPLOYER_PRIVATE_KEY] : [],
     },
   },
+  abiExporter: {
+    path: './abi',
+    runOnCompile: true,
+    clear: true,
+  }
 };
 
 export default config;
