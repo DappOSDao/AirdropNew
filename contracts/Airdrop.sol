@@ -13,7 +13,7 @@ import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 ///         preserving pause controls and post-deadline recovery flows.
 contract Airdrop is Ownable2Step, ReentrancyGuard, Pausable {
     using SafeERC20 for IERC20;
-    
+
     IERC20 public immutable token;
     bytes32 public merkleRoot;
     uint256 public claimEndTime;
@@ -101,7 +101,9 @@ contract Airdrop is Ownable2Step, ReentrancyGuard, Pausable {
             isEligible &&
             !hasClaimed[wallet] &&
             block.timestamp < claimEndTime &&
-            amount > 0;
+            amount > 0 &&
+            !paused() &&
+            amount <= token.balanceOf(address(this));
     }
 
     /// @notice Seconds left until `claimEndTime` elapses (0 if expired).
