@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/access/Ownable2Step.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
@@ -10,7 +10,7 @@ import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 /// @title Airdrop
 /// @notice Streams ERC20 rewards to addresses listed in a Merkle tree while
 ///         preserving pause controls and post-deadline recovery flows.
-contract Airdrop is Ownable, ReentrancyGuard, Pausable {
+contract Airdrop is Ownable2Step, ReentrancyGuard, Pausable {
     IERC20 public immutable token;
     bytes32 public merkleRoot;
     uint256 public claimEndTime;
