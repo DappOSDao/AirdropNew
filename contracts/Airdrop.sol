@@ -22,9 +22,9 @@ contract Airdrop is Ownable2Step, ReentrancyGuard, Pausable {
     uint256 private _totalClaimedCount;
     uint256 private _totalClaimedAmount;
 
-    event MerkleRootSetted(bytes32 indexed root);
+    event MerkleRootSet(bytes32 indexed root);
     event Claimed(address indexed addr, uint256 amount);
-    event ClaimEndTimeSetted(uint256 newEndTime);
+    event ClaimEndTimeSet(uint256 newEndTime);
     event Withdrawn(address indexed addr, uint256 amount);
 
     /// @notice Initialize the contract and bind the ERC20 that will be streamed.
@@ -40,7 +40,7 @@ contract Airdrop is Ownable2Step, ReentrancyGuard, Pausable {
         require(_merkleRoot != bytes32(0), "Invalid merkle root");
         merkleRoot = _merkleRoot;
 
-        emit MerkleRootSetted(_merkleRoot);
+        emit MerkleRootSet(_merkleRoot);
     }
 
     /// @notice Extend or shorten the claim deadline without touching the root.
@@ -49,7 +49,7 @@ contract Airdrop is Ownable2Step, ReentrancyGuard, Pausable {
         require(_claimEndTime > block.timestamp, "Invalid end time");
         claimEndTime = _claimEndTime;
 
-        emit ClaimEndTimeSetted(_claimEndTime);
+        emit ClaimEndTimeSet(_claimEndTime);
     }
 
     /// @notice Claim tokens that were pre-allocated in the Merkle tree.
