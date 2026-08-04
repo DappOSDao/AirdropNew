@@ -62,6 +62,12 @@
     "anonymous": false,
     "inputs": [
       {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "roundId",
+        "type": "uint256"
+      },
+      {
         "indexed": false,
         "internalType": "uint256",
         "name": "newEndTime",
@@ -74,6 +80,12 @@
   {
     "anonymous": false,
     "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "roundId",
+        "type": "uint256"
+      },
       {
         "indexed": true,
         "internalType": "address",
@@ -93,6 +105,31 @@
   {
     "anonymous": false,
     "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "roundId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "maxClaimPerAccount",
+        "type": "uint256"
+      }
+    ],
+    "name": "MaxClaimPerAccountSet",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "roundId",
+        "type": "uint256"
+      },
       {
         "indexed": true,
         "internalType": "bytes32",
@@ -158,6 +195,68 @@
     "anonymous": false,
     "inputs": [
       {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "roundId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "merkleRoot",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "claimStartTime",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "claimEndTime",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "suppliedAmount",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "maxClaimPerAccount",
+        "type": "uint256"
+      }
+    ],
+    "name": "RoundCreated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "roundId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "TokensAdded",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
         "indexed": false,
         "internalType": "address",
         "name": "account",
@@ -170,6 +269,12 @@
   {
     "anonymous": false,
     "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "roundId",
+        "type": "uint256"
+      },
       {
         "indexed": true,
         "internalType": "address",
@@ -195,6 +300,29 @@
   },
   {
     "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "roundId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "addTokens",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "roundId",
+        "type": "uint256"
+      },
       {
         "internalType": "address",
         "name": "wallet",
@@ -231,6 +359,11 @@
     "inputs": [
       {
         "internalType": "uint256",
+        "name": "roundId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
         "name": "amount",
         "type": "uint256"
       },
@@ -246,63 +379,104 @@
     "type": "function"
   },
   {
-    "inputs": [],
-    "name": "claimEndTime",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "getAirdropInfos",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "totalClaimedCount",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "totalClaimedAmount",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "_balance",
-        "type": "uint256"
-      },
+    "inputs": [
       {
         "internalType": "bytes32",
-        "name": "_merkleRoot",
+        "name": "merkleRoot",
         "type": "bytes32"
       },
       {
         "internalType": "uint256",
-        "name": "_claimEndTime",
+        "name": "claimStartTime",
         "type": "uint256"
       },
       {
-        "internalType": "bool",
-        "name": "_isClaimable",
-        "type": "bool"
+        "internalType": "uint256",
+        "name": "claimEndTime",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "suppliedAmount",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "maxClaimPerAccount",
+        "type": "uint256"
       }
     ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "getClaimTimeRemaining",
+    "name": "createRound",
     "outputs": [
       {
         "internalType": "uint256",
-        "name": "claimTimeRemaining",
+        "name": "roundId",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "roundId",
+        "type": "uint256"
+      }
+    ],
+    "name": "getAirdropInfos",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "bytes32",
+            "name": "merkleRoot",
+            "type": "bytes32"
+          },
+          {
+            "internalType": "uint256",
+            "name": "claimStartTime",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "claimEndTime",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "totalSuppliedAmount",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "totalClaimedAmount",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "maxClaimPerAccount",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "totalClaimedCount",
+            "type": "uint256"
+          },
+          {
+            "internalType": "bool",
+            "name": "exists",
+            "type": "bool"
+          }
+        ],
+        "internalType": "struct Airdrop.Round",
+        "name": "round",
+        "type": "tuple"
+      },
+      {
+        "internalType": "uint256",
+        "name": "contractBalance",
         "type": "uint256"
       }
     ],
@@ -311,6 +485,45 @@
   },
   {
     "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "roundId",
+        "type": "uint256"
+      }
+    ],
+    "name": "getClaimTimeStatus",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "hasStarted",
+        "type": "bool"
+      },
+      {
+        "internalType": "uint256",
+        "name": "startTimeRemaining",
+        "type": "uint256"
+      },
+      {
+        "internalType": "bool",
+        "name": "hasEnded",
+        "type": "bool"
+      },
+      {
+        "internalType": "uint256",
+        "name": "endTimeRemaining",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      },
       {
         "internalType": "address",
         "name": "",
@@ -323,19 +536,6 @@
         "internalType": "bool",
         "name": "",
         "type": "bool"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "merkleRoot",
-    "outputs": [
-      {
-        "internalType": "bytes32",
-        "name": "",
-        "type": "bytes32"
       }
     ],
     "stateMutability": "view",
@@ -395,10 +595,82 @@
     "type": "function"
   },
   {
+    "inputs": [],
+    "name": "roundCount",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [
       {
         "internalType": "uint256",
-        "name": "_claimEndTime",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "rounds",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "merkleRoot",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "uint256",
+        "name": "claimStartTime",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "claimEndTime",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "totalSuppliedAmount",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "totalClaimedAmount",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "maxClaimPerAccount",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "totalClaimedCount",
+        "type": "uint256"
+      },
+      {
+        "internalType": "bool",
+        "name": "exists",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "roundId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "claimEndTime",
         "type": "uint256"
       }
     ],
@@ -410,8 +682,31 @@
   {
     "inputs": [
       {
+        "internalType": "uint256",
+        "name": "roundId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "maxClaimPerAccount",
+        "type": "uint256"
+      }
+    ],
+    "name": "setMaxClaimPerAccount",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "roundId",
+        "type": "uint256"
+      },
+      {
         "internalType": "bytes32",
-        "name": "_merkleRoot",
+        "name": "merkleRoot",
         "type": "bytes32"
       }
     ],
@@ -457,8 +752,13 @@
     "inputs": [
       {
         "internalType": "uint256",
-        "name": "amount",
+        "name": "roundId",
         "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "to",
+        "type": "address"
       }
     ],
     "name": "withdraw",

@@ -9,160 +9,303 @@ import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 
 /// @title Airdrop
-/// @notice Streams ERC20 rewards to addresses listed in a Merkle tree while
-///         preserving pause controls and post-deadline recovery flows.
+/// @notice Supports multiple ERC20 airdrop rounds in one contract. Each round has
+///         an independent Merkle root, claim deadline, funding amount and claimed state.
 contract Airdrop is Ownable2Step, ReentrancyGuard, Pausable {
     using SafeERC20 for IERC20;
 
+    /// @notice ERC20 token distributed by all rounds in this contract.
     IERC20 public immutable token;
-    bytes32 public merkleRoot;
-    uint256 public claimEndTime;
 
-    mapping(address => bool) public hasClaimed;
-    uint256 private _totalClaimedCount;
-    uint256 private _totalClaimedAmount;
+    struct Round {
+        bytes32 merkleRoot;
+        uint256 claimStartTime;
+        uint256 claimEndTime;
+        uint256 totalSuppliedAmount;
+        uint256 totalClaimedAmount;
+        uint256 maxClaimPerAccount;
+        uint256 totalClaimedCount;
+        bool exists;
+    }
 
-    event MerkleRootSet(bytes32 indexed root);
-    event Claimed(address indexed addr, uint256 amount);
-    event ClaimEndTimeSet(uint256 newEndTime);
-    event Withdrawn(address indexed addr, uint256 amount);
+    /// @notice Number of rounds created so far. Round ids are [0, roundCount).
+    uint256 public roundCount;
 
-    /// @notice Initialize the contract and bind the ERC20 that will be streamed.
+    /// @notice roundId => round config and aggregate accounting.
+    mapping(uint256 => Round) public rounds;
+
+    /// @notice roundId => wallet => claimed.
+    mapping(uint256 => mapping(address => bool)) public hasClaimed;
+
+    event RoundCreated(
+        uint256 indexed roundId,
+        bytes32 indexed merkleRoot,
+        uint256 claimStartTime,
+        uint256 claimEndTime,
+        uint256 suppliedAmount,
+        uint256 maxClaimPerAccount
+    );
+    event MerkleRootSet(uint256 indexed roundId, bytes32 indexed root);
+    event Claimed(
+        uint256 indexed roundId,
+        address indexed addr,
+        uint256 amount
+    );
+    event ClaimEndTimeSet(uint256 indexed roundId, uint256 newEndTime);
+    event MaxClaimPerAccountSet(
+        uint256 indexed roundId,
+        uint256 maxClaimPerAccount
+    );
+    event TokensAdded(uint256 indexed roundId, uint256 amount);
+    event Withdrawn(
+        uint256 indexed roundId,
+        address indexed addr,
+        uint256 amount
+    );
+
+    /// @notice Initialize the contract and bind the ERC20 that will be distributed.
     /// @param tokenAddr ERC20 token distributed by this contract.
     constructor(address tokenAddr) Ownable(msg.sender) {
         require(tokenAddr != address(0), "Invalid token address");
         token = IERC20(tokenAddr);
     }
 
-    /// @notice Configure the active Merkle tree.
-    /// @param _merkleRoot Packed wallet+amount Merkle root.
-    function setMerkleRoot(bytes32 _merkleRoot) external onlyOwner {
-        require(_merkleRoot != bytes32(0), "Invalid merkle root");
-        merkleRoot = _merkleRoot;
-
-        emit MerkleRootSet(_merkleRoot);
+    modifier roundExists(uint256 roundId) {
+        require(rounds[roundId].exists, "Round not found");
+        _;
     }
 
-    /// @notice Extend or shorten the claim deadline without touching the root.
-    /// @param _claimEndTime Replacement timestamp for `claimEndTime`.
-    function setClaimEndTime(uint256 _claimEndTime) external onlyOwner {
-        require(_claimEndTime > block.timestamp, "Invalid end time");
-        claimEndTime = _claimEndTime;
+    /// @notice Create a new airdrop round and optionally fund it in the same tx.
+    /// @dev Caller must approve this contract for `suppliedAmount` before calling.
+    /// @param merkleRoot Merkle root for leaves keccak256(abi.encodePacked(wallet, amount)).
+    /// @param claimStartTime Claim start timestamp.
+    /// @param claimEndTime Claim deadline timestamp.
+    /// @param suppliedAmount Initial token amount assigned to this round.
+    /// @param maxClaimPerAccount Maximum amount a single account can claim in this round.
+    /// @return roundId Newly created round id.
+    function createRound(
+        bytes32 merkleRoot,
+        uint256 claimStartTime,
+        uint256 claimEndTime,
+        uint256 suppliedAmount,
+        uint256 maxClaimPerAccount
+    ) external onlyOwner nonReentrant returns (uint256 roundId) {
+        require(merkleRoot != bytes32(0), "Invalid merkle root");
+        require(
+            claimStartTime > block.timestamp && claimEndTime > claimStartTime,
+            "Invalid claim time"
+        );
+        require(suppliedAmount > 0, "Invalid supplied amount");
+        require(maxClaimPerAccount > 0, "Invalid max claim");
 
-        emit ClaimEndTimeSet(_claimEndTime);
+        roundId = roundCount;
+        roundCount++;
+
+        rounds[roundId] = Round({
+            merkleRoot: merkleRoot,
+            claimStartTime: claimStartTime,
+            claimEndTime: claimEndTime,
+            totalSuppliedAmount: suppliedAmount,
+            totalClaimedAmount: 0,
+            maxClaimPerAccount: maxClaimPerAccount,
+            totalClaimedCount: 0,
+            exists: true
+        });
+
+        token.safeTransferFrom(msg.sender, address(this), suppliedAmount);
+
+        emit RoundCreated(
+            roundId,
+            merkleRoot,
+            claimStartTime,
+            claimEndTime,
+            suppliedAmount,
+            maxClaimPerAccount
+        );
     }
 
-    /// @notice Claim tokens that were pre-allocated in the Merkle tree.
+    /// @notice Add more tokens to an existing round.
+    /// @dev Caller must approve this contract for `amount` before calling.
+    function addTokens(
+        uint256 roundId,
+        uint256 amount
+    ) external onlyOwner nonReentrant roundExists(roundId) {
+        require(amount > 0, "Invalid amount");
+
+        rounds[roundId].totalSuppliedAmount += amount;
+        token.safeTransferFrom(msg.sender, address(this), amount);
+
+        emit TokensAdded(roundId, amount);
+    }
+
+    /// @notice Update a round Merkle root.
+    /// @param roundId Target round id.
+    /// @param merkleRoot New packed wallet+amount Merkle root.
+    function setMerkleRoot(
+        uint256 roundId,
+        bytes32 merkleRoot
+    ) external onlyOwner roundExists(roundId) {
+        require(merkleRoot != bytes32(0), "Invalid merkle root");
+        rounds[roundId].merkleRoot = merkleRoot;
+
+        emit MerkleRootSet(roundId, merkleRoot);
+    }
+
+    /// @notice Extend or shorten a round claim deadline without touching the root.
+    /// @param roundId Target round id.
+    /// @param claimEndTime Replacement timestamp for the round deadline.
+    function setClaimEndTime(
+        uint256 roundId,
+        uint256 claimEndTime
+    ) external onlyOwner roundExists(roundId) {
+        Round storage round = rounds[roundId];
+        require(claimEndTime > round.claimStartTime, "Invalid end time");
+        round.claimEndTime = claimEndTime;
+
+        emit ClaimEndTimeSet(roundId, claimEndTime);
+    }
+
+    /// @notice Update a round's per-account maximum claim amount.
+    /// @param roundId Target round id.
+    /// @param maxClaimPerAccount New maximum amount a single account can claim.
+    function setMaxClaimPerAccount(
+        uint256 roundId,
+        uint256 maxClaimPerAccount
+    ) external onlyOwner roundExists(roundId) {
+        require(maxClaimPerAccount > 0, "Invalid max claim");
+        rounds[roundId].maxClaimPerAccount = maxClaimPerAccount;
+
+        emit MaxClaimPerAccountSet(roundId, maxClaimPerAccount);
+    }
+
+    /// @notice Claim tokens pre-allocated in one round's Merkle tree.
+    /// @param roundId Target round id.
     /// @param amount Exact amount encoded for the caller.
     /// @param proof Merkle branch that proves inclusion.
     function claim(
+        uint256 roundId,
         uint256 amount,
         bytes32[] calldata proof
-    ) external whenNotPaused nonReentrant {
-        require(merkleRoot != bytes32(0), "Merkle root unset");
-        require(block.timestamp < claimEndTime, "Deadline elapsed");
-        require(!hasClaimed[msg.sender], "Already claimed");
-        require(amount > 0, "No tokens to claim");
+    ) external whenNotPaused nonReentrant roundExists(roundId) {
+        Round storage round = rounds[roundId];
+
         require(
-            amount <= token.balanceOf(address(this)),
+            block.timestamp >= round.claimStartTime &&
+                block.timestamp < round.claimEndTime,
+            "Invalid claim time"
+        );
+        require(!hasClaimed[roundId][msg.sender], "Already claimed");
+        require(
+            amount > 0 && amount <= round.maxClaimPerAccount,
+            "Invalid claim amount"
+        );
+        require(
+            round.totalClaimedAmount + amount <= round.totalSuppliedAmount &&
+                amount <= token.balanceOf(address(this)),
             "Insufficient balance"
         );
 
-        // Verify the Merkle proof
         bytes32 leaf = keccak256(abi.encodePacked(msg.sender, amount));
-        bool isValidProof = MerkleProof.verify(proof, merkleRoot, leaf);
+        bool isValidProof = MerkleProof.verify(proof, round.merkleRoot, leaf);
         require(isValidProof, "Invalid proof");
 
-        // Mark as claimed and transfer tokens
-        hasClaimed[msg.sender] = true;
-        _totalClaimedCount++;
-        _totalClaimedAmount += amount;
+        hasClaimed[roundId][msg.sender] = true;
+        round.totalClaimedCount++;
+        round.totalClaimedAmount += amount;
 
         token.safeTransfer(msg.sender, amount);
 
-        emit Claimed(msg.sender, amount);
+        emit Claimed(roundId, msg.sender, amount);
     }
 
-    /// @notice View helper to check a proof and operational constraints.
+    /// @notice View helper to check a proof and operational constraints for a round.
+    /// @param roundId Target round id.
     /// @param wallet Address to inspect.
     /// @param amount Amount linked to `wallet` in the tree.
     /// @param proof Merkle branch to validate.
-    /// @return isEligible True if the branch matches the current root.
-    /// @return canClaim True if the wallet can still claim right now.
+    /// @return isEligible True if the branch matches the round root.
+    /// @return canClaim True if the wallet can still claim this round right now.
     function checkEligibility(
+        uint256 roundId,
         address wallet,
         uint256 amount,
         bytes32[] calldata proof
-    ) external view returns (bool isEligible, bool canClaim) {
+    )
+        external
+        view
+        roundExists(roundId)
+        returns (bool isEligible, bool canClaim)
+    {
+        Round storage round = rounds[roundId];
         bytes32 leaf = keccak256(abi.encodePacked(wallet, amount));
-        isEligible = MerkleProof.verify(proof, merkleRoot, leaf);
+        isEligible = MerkleProof.verify(proof, round.merkleRoot, leaf);
 
         canClaim =
             isEligible &&
-            !hasClaimed[wallet] &&
-            block.timestamp < claimEndTime &&
+            !hasClaimed[roundId][wallet] &&
+            block.timestamp >= round.claimStartTime &&
+            block.timestamp < round.claimEndTime &&
             amount > 0 &&
+            amount <= round.maxClaimPerAccount &&
             !paused() &&
+            round.totalClaimedAmount + amount <= round.totalSuppliedAmount &&
             amount <= token.balanceOf(address(this));
     }
 
-    /// @notice Seconds left until `claimEndTime` elapses (0 if expired).
-    function getClaimTimeRemaining()
+    /// @notice Claim time status for a round.
+    function getClaimTimeStatus(
+        uint256 roundId
+    )
         external
         view
-        returns (uint256 claimTimeRemaining)
-    {
-        if (block.timestamp >= claimEndTime) {
-            return 0;
-        }
-        return claimEndTime - block.timestamp;
-    }
-
-    /// @notice Owner-only snapshot with aggregate distribution stats.
-    /// @return totalClaimedCount Number of wallets that claimed successfully.
-    /// @return totalClaimedAmount Total tokens transferred out.
-    /// @return _balance Current ERC20 balance held by the contract.
-    /// @return _merkleRoot Active Merkle root.
-    /// @return _claimEndTime Current claim deadline timestamp.
-    /// @return _isClaimable True if the deadline has not yet elapsed.
-    function getAirdropInfos()
-        external
-        view
-        onlyOwner
+        roundExists(roundId)
         returns (
-            uint256 totalClaimedCount,
-            uint256 totalClaimedAmount,
-            uint256 _balance,
-            bytes32 _merkleRoot,
-            uint256 _claimEndTime,
-            bool _isClaimable
+            bool hasStarted,
+            uint256 startTimeRemaining,
+            bool hasEnded,
+            uint256 endTimeRemaining
         )
     {
-        return (
-            _totalClaimedCount,
-            _totalClaimedAmount,
-            token.balanceOf(address(this)),
-            merkleRoot,
-            claimEndTime,
-            block.timestamp < claimEndTime
-        );
+        Round storage round = rounds[roundId];
+
+        hasStarted = block.timestamp >= round.claimStartTime;
+        hasEnded = block.timestamp >= round.claimEndTime;
+        startTimeRemaining = hasStarted
+            ? 0
+            : round.claimStartTime - block.timestamp;
+        endTimeRemaining = hasEnded ? 0 : round.claimEndTime - block.timestamp;
     }
 
-    /// @notice Recover leftover tokens after the claim window ends.
-    /// @param amount Amount to transfer to the owner.
-    function withdraw(uint256 amount) external onlyOwner nonReentrant {
-        require(amount > 0, "Invalid amount");
-        require(
-            amount <= token.balanceOf(address(this)),
-            "Insufficient balance "
-        );
-        require(
-            block.timestamp >= claimEndTime || merkleRoot == bytes32(0),
-            "Withdraw disabled"
-        );
-        token.safeTransfer(owner(), amount);
+    /// @notice Owner-only snapshot with round data and current contract token balance.
+    function getAirdropInfos(
+        uint256 roundId
+    )
+        external
+        view
+        roundExists(roundId)
+        returns (Round memory round, uint256 contractBalance)
+    {
+        round = rounds[roundId];
+        contractBalance = token.balanceOf(address(this));
+    }
 
-        emit Withdrawn(owner(), amount);
+    /// @notice Recover a round's unclaimed tokens.
+    /// @param roundId Target round id.
+    /// @param to Receiver of leftover tokens.
+    function withdraw(
+        uint256 roundId,
+        address to
+    ) external onlyOwner nonReentrant roundExists(roundId) {
+        require(to != address(0), "Invalid receiver");
+
+        Round storage round = rounds[roundId];
+        uint256 amount = round.totalSuppliedAmount - round.totalClaimedAmount;
+        require(amount > 0, "Invalid amount");
+
+        round.totalClaimedAmount = round.totalSuppliedAmount;
+        token.safeTransfer(to, amount);
+
+        emit Withdrawn(roundId, to, amount);
     }
 
     /// @notice Pause claiming (emergencies only).
