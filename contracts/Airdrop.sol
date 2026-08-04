@@ -51,6 +51,7 @@ contract Airdrop is Ownable2Step, ReentrancyGuard, Pausable {
         address indexed addr,
         uint256 amount
     );
+    event ClaimStartTimeSet(uint256 indexed roundId, uint256 newStartTime);
     event ClaimEndTimeSet(uint256 indexed roundId, uint256 newEndTime);
     event MaxClaimPerAccountSet(
         uint256 indexed roundId,
@@ -149,6 +150,20 @@ contract Airdrop is Ownable2Step, ReentrancyGuard, Pausable {
         rounds[roundId].merkleRoot = merkleRoot;
 
         emit MerkleRootSet(roundId, merkleRoot);
+    }
+
+    /// @notice Update a round claim start time without touching the root.
+    /// @param roundId Target round id.
+    /// @param claimStartTime Replacement timestamp for the round start time.
+    function setClaimStartTime(
+        uint256 roundId,
+        uint256 claimStartTime
+    ) external onlyOwner roundExists(roundId) {
+        Round storage round = rounds[roundId];
+        require(claimStartTime < round.claimEndTime, "Invalid start time");
+        round.claimStartTime = claimStartTime;
+
+        emit ClaimStartTimeSet(roundId, claimStartTime);
     }
 
     /// @notice Extend or shorten a round claim deadline without touching the root.

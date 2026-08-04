@@ -4,11 +4,11 @@ async function main() {
   const [signer] = await ethers.getSigners();
 
   const airdropAddress = process.env.AIRDROP_ADDRESS!;
-  const merkleRootInput = process.env.MERKLE_ROOT!;
-  const claimStartTimeInput = process.env.CLAIM_START_TIME;
-  const claimEndTimeInput = process.env.CLAIM_END_TIME;
-  const suppliedAmount = BigInt(process.env.SUPPLIED_AMOUNT ?? "0");
-  const maxClaimPerAccountInput = process.env.MAX_CLAIM_PER_ACCOUNT;
+  const merkleRootInput = "0xe41f2544f5ebf2979f6425f2f737efe0ed2b90a6da5cfe7992799785da8b49f3";
+  const claimStartTimeInput = 1786010485;
+  const claimEndTimeInput = 1786784485;
+  const suppliedAmount = "1000000000000000000000";  //1000
+  const maxClaimPerAccountInput = "100000000000000000000"; //100
 
   if (!airdropAddress || !ethers.isAddress(airdropAddress)) {
     throw new Error("Missing or invalid AIRDROP_ADDRESS env value.");
@@ -25,13 +25,7 @@ async function main() {
   if (!maxClaimPerAccountInput) {
     throw new Error("Missing MAX_CLAIM_PER_ACCOUNT env value.");
   }
-  const claimStartTime = BigInt(claimStartTimeInput);
-  const claimEndTime = BigInt(claimEndTimeInput);
-  const maxClaimPerAccount = BigInt(maxClaimPerAccountInput);
-  if (maxClaimPerAccount <= 0n) {
-    throw new Error("MAX_CLAIM_PER_ACCOUNT must be greater than 0.");
-  }
-
+  
   const airdrop = await ethers.getContractAt("Airdrop", airdropAddress, signer);
   const tokenAddress = await airdrop.token();
   const token = await ethers.getContractAt("IERC20", tokenAddress, signer);
@@ -39,20 +33,18 @@ async function main() {
   console.log(`Using signer: ${signer.address}`);
   console.log(`Airdrop: ${airdropAddress}`);
   console.log(`Token: ${tokenAddress}`);
-  console.log(`Creating round: root=${merkleRootInput}, start=${claimStartTime}, end=${claimEndTime}, supplied=${suppliedAmount}, maxClaimPerAccount=${maxClaimPerAccount}`);
-
-  if (suppliedAmount > 0n) {
-    const approveTx = await token.approve(airdropAddress, suppliedAmount);
-    console.log("Approve tx sent:", approveTx.hash);
-    await approveTx.wait();
-  }
+  console.log(`Creating round: root=${merkleRootInput}, start=${claimStartTimeInput}, end=${claimEndTimeInput}, supplied=${suppliedAmount}, maxClaimPerAccount=${claimStartTimeInput}`);
+  
+  const approveTx = await token.approve(airdropAddress, suppliedAmount);
+  console.log("Approve tx sent:", approveTx.hash);
+  await approveTx.wait();
 
   const tx = await airdrop.createRound(
     ethers.getBytes(merkleRootInput),
-    claimStartTime,
-    claimEndTime,
+    claimStartTimeInput,
+    claimEndTimeInput,
     suppliedAmount,
-    maxClaimPerAccount
+    maxClaimPerAccountInput
   );
   console.log("Create round tx sent:", tx.hash);
 
