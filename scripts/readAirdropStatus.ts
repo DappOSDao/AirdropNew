@@ -39,18 +39,28 @@ async function main() {
     paused,
     roundCount,
     round,
-    claimTimeStatus,
     hasClaimed,
     airdropTokenBalance,
+    latestBlock,
   ] = await Promise.all([
     airdrop.owner(),
     airdrop.paused(),
     airdrop.roundCount(),
     airdrop.rounds(roundId),
-    airdrop.getClaimTimeStatus(roundId),
     airdrop.hasClaimed(roundId, walletAddress),
     token.balanceOf(airdropAddress),
+    signer.provider.getBlock("latest"),
   ]);
+
+  if (!latestBlock) {
+    throw new Error("Failed to fetch latest block.");
+  }
+
+  const now = BigInt(latestBlock.timestamp);
+  const hasStarted = now >= round.claimStartTime;
+  const hasEnded = now >= round.claimEndTime;
+  const startTimeRemaining = hasStarted ? 0n : round.claimStartTime - now;
+  const endTimeRemaining = hasEnded ? 0n : round.claimEndTime - now;
 
   console.log("=== Airdrop Status ===");
   console.log(`Network: chainId=${network.chainId.toString()} (${network.name})`);
@@ -65,40 +75,18 @@ async function main() {
   console.log(`Merkle root: ${round.merkleRoot}`);
   console.log(`Claim start time: ${formatTimestamp(round.claimStartTime)}`);
   console.log(`Claim end time: ${formatTimestamp(round.claimEndTime)}`);
-  console.log(`Has started: ${claimTimeStatus.hasStarted}`);
-  console.log(`Start time remaining: ${claimTimeStatus.startTimeRemaining.toString()} seconds`);
-  console.log(`Has ended: ${claimTimeStatus.hasEnded}`);
-  console.log(`End time remaining: ${claimTimeStatus.endTimeRemaining.toString()} seconds`);
-  console.log(`Is claim window open: ${claimTimeStatus.hasStarted && !claimTimeStatus.hasEnded}`);
-  console.log(`Total supplied amount: ${round.totalSuppliedAmount.toString()}`);
+  console.log(`Has started: ${hasStarted}`);
+  console.log(`Start time remaining: ${startTimeRemaining.toString()} seconds`);
+  console.log(`Has ended: ${hasEnded}`);
+  console.log(`End time remaining: ${endTimeRemaining.toString()} seconds`);
+  console.log(`Is claim window open: ${hasStarted && !hasEnded}`);
   console.log(`Max claim per account: ${round.maxClaimPerAccount.toString()}`);
-  console.log(`Total claimed count: ${round.totalClaimedCount.toString()}`);
-  console.log(`Total claimed amount: ${round.totalClaimedAmount.toString()}`);
-  console.log(`Round unclaimed amount: ${(round.totalSuppliedAmount - round.totalClaimedAmount).toString()}`);
   console.log(`Airdrop token balance: ${airdropTokenBalance.toString()}`);
 
   console.log("\n=== Wallet Query ===");
   console.log(`Wallet: ${walletAddress}`);
   console.log(`Has claimed this round: ${hasClaimed}`);
   console.log(`Is owner: ${walletAddress.toLowerCase() === owner.toLowerCase()}`);
-
-  console.log("\n=== Owner-only Airdrop Infos ===");
-  try {
-    const info = await airdrop.getAirdropInfos(roundId);
-    const infoRound = info.round;
-    console.log(`Total claimed count: ${infoRound.totalClaimedCount.toString()}`);
-    console.log(`Total claimed amount: ${infoRound.totalClaimedAmount.toString()}`);
-    console.log(`Total supplied amount: ${infoRound.totalSuppliedAmount.toString()}`);
-    console.log(`Unclaimed amount: ${(infoRound.totalSuppliedAmount - infoRound.totalClaimedAmount).toString()}`);
-    console.log(`Max claim per account: ${infoRound.maxClaimPerAccount.toString()}`);
-    console.log(`Contract token balance: ${info.contractBalance.toString()}`);
-    console.log(`Info merkle root: ${infoRound.merkleRoot}`);
-    console.log(`Info claim start time: ${formatTimestamp(infoRound.claimStartTime)}`);
-    console.log(`Info claim end time: ${formatTimestamp(infoRound.claimEndTime)}`);
-    console.log(`Info is claimable: ${claimTimeStatus.hasStarted && !claimTimeStatus.hasEnded}`);
-  } catch (error) {
-    console.log("Skipped: getAirdropInfos(roundId) is onlyOwner, current signer is not owner or call failed.");
-  }
 
   console.log("\nNote: checkEligibility(roundId, wallet, amount, proof) 还需要 amount 和 merkle proof，无法仅凭地址查询。");
 }

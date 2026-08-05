@@ -34,8 +34,9 @@ describe("Airdrop", function () {
     await airdrop.waitForDeployment();
 
     const totalAllocation = claims.reduce((sum, [, amount]) => sum + amount, 0n);
-    await token.mint(owner.address, totalAllocation * 2n);
-    await token.approve(airdrop.target, totalAllocation * 2n);
+    const contractFunding = totalAllocation * 2n;
+    await token.mint(owner.address, contractFunding);
+    await token.transfer(airdrop.target, contractFunding);
 
     const startTime = (await time.latest()) + 60;
     const deadline = startTime + 3600;
@@ -44,7 +45,6 @@ describe("Airdrop", function () {
       tree.root,
       startTime,
       deadline,
-      totalAllocation,
       maxClaimPerAccount
     );
     await tx.wait();
@@ -64,6 +64,7 @@ describe("Airdrop", function () {
       startTime,
       deadline,
       totalAllocation,
+      contractFunding,
       maxClaimPerAccount,
       roundId,
     };
@@ -94,9 +95,7 @@ describe("Airdrop", function () {
     const proof = proofFor(tree, leaves, alice.address, amount);
     await time.increaseTo(startTime);
 
-    await expect(airdrop.connect(alice).claim(roundId, amount, proof))
-      .to.emit(airdrop, "Claimed")
-      .withArgs(roundId, alice.address, amount);
+    await airdrop.connect(alice).claim(roundId, amount, proof);
 
     expect(await token.balanceOf(alice.address)).to.equal(amount);
   });
@@ -122,13 +121,11 @@ describe("Airdrop", function () {
     const amount = claims.find(([wallet]) => wallet === alice.address)![1];
     const proof = proofFor(tree, leaves, alice.address, amount);
 
-    const secondRoundAmount = claims.reduce((sum, [, value]) => sum + value, 0n);
     const secondStartTime = startTime + 1;
     await airdrop.createRound(
       tree.root,
       secondStartTime,
       deadline + 3600,
-      secondRoundAmount,
       amount
     );
 
@@ -163,20 +160,20 @@ describe("Airdrop", function () {
   });
 
   it("rejects invalid round start and end times", async function () {
-    const { airdrop, tree, startTime, deadline, totalAllocation, maxClaimPerAccount } =
+    const { airdrop, tree, startTime, deadline, maxClaimPerAccount } =
       await loadFixture(deployFixture);
 
     await expect(
-      airdrop.createRound(tree.root, startTime - 120, deadline, totalAllocation, maxClaimPerAccount)
+      airdrop.createRound(tree.root, startTime - 120, deadline, maxClaimPerAccount)
     ).to.be.revertedWith("Invalid claim time");
 
     await expect(
-      airdrop.createRound(tree.root, deadline + 1, deadline, totalAllocation, maxClaimPerAccount)
+      airdrop.createRound(tree.root, deadline + 1, deadline, maxClaimPerAccount)
     ).to.be.revertedWith("Invalid claim time");
   });
 
   it("rejects claims above the round max even with a valid proof", async function () {
-    const { owner, token, airdrop, alice } = await loadFixture(deployFixture);
+    const { airdrop, alice } = await loadFixture(deployFixture);
     const excessiveAmount = ethers.parseEther("101");
     const maxClaimPerAccount = ethers.parseEther("100");
     const leaves = [
@@ -189,13 +186,10 @@ describe("Airdrop", function () {
     const startTime = (await time.latest()) + 60;
     const deadline = startTime + 3600;
 
-    await token.mint(owner.address, excessiveAmount);
-    await token.approve(airdrop.target, excessiveAmount);
     await airdrop.createRound(
       tree.root,
       startTime,
       deadline,
-      excessiveAmount,
       maxClaimPerAccount
     );
 
@@ -215,38 +209,12 @@ describe("Airdrop", function () {
   });
 
   it("rejects creating a round with zero max claim per account", async function () {
-    const { airdrop, tree, deadline, totalAllocation } = await loadFixture(
+    const { airdrop, tree, deadline } = await loadFixture(
       deployFixture
     );
 
     await expect(
-      airdrop.createRound(tree.root, deadline + 1, deadline + 3600, totalAllocation, 0)
-    ).to.be.revertedWith("Invalid max claim");
-  });
-
-  it("lets owner update max claim per account", async function () {
-    const { airdrop, owner, alice, outsider, claims, tree, leaves, startTime, roundId } =
-      await loadFixture(deployFixture);
-    const amount = claims.find(([wallet]) => wallet === alice.address)![1];
-    const proof = proofFor(tree, leaves, alice.address, amount);
-    const loweredMax = amount - 1n;
-
-    await expect(airdrop.connect(owner).setMaxClaimPerAccount(roundId, loweredMax))
-      .to.emit(airdrop, "MaxClaimPerAccountSet")
-      .withArgs(roundId, loweredMax);
-
-    await time.increaseTo(startTime);
-
-    await expect(
-      airdrop.connect(alice).claim(roundId, amount, proof)
-    ).to.be.revertedWith("Invalid claim amount");
-
-    await expect(
-      airdrop.connect(outsider).setMaxClaimPerAccount(roundId, amount)
-    ).to.be.revertedWithCustomError(airdrop, "OwnableUnauthorizedAccount");
-
-    await expect(
-      airdrop.connect(owner).setMaxClaimPerAccount(roundId, 0)
+      airdrop.createRound(tree.root, deadline + 1, deadline + 3600, 0)
     ).to.be.revertedWith("Invalid max claim");
   });
 
@@ -264,19 +232,17 @@ describe("Airdrop", function () {
   });
 
   it("lets owner withdraw round leftovers before the deadline", async function () {
-    const { airdrop, owner, token, roundId, totalAllocation } =
+    const { airdrop, owner, token, roundId, contractFunding } =
       await loadFixture(deployFixture);
 
     const ownerBefore = await token.balanceOf(owner.address);
-    await expect(airdrop.connect(owner).withdraw(roundId, owner.address))
-      .to.emit(airdrop, "Withdrawn")
-      .withArgs(roundId, owner.address, totalAllocation);
+    await airdrop.connect(owner).withdraw(roundId, owner.address);
 
-    expect(await token.balanceOf(owner.address)).to.equal(ownerBefore + totalAllocation);
+    expect(await token.balanceOf(owner.address)).to.equal(ownerBefore + contractFunding);
   });
 
   it("prevents claims after the deadline and lets owner withdraw round leftovers", async function () {
-    const { airdrop, owner, alice, token, claims, tree, leaves, deadline, roundId, totalAllocation } =
+    const { airdrop, owner, alice, token, claims, tree, leaves, deadline, roundId, contractFunding } =
       await loadFixture(deployFixture);
 
     await time.increaseTo(deadline + 1);
@@ -289,11 +255,9 @@ describe("Airdrop", function () {
     ).to.be.revertedWith("Invalid claim time");
 
     const ownerBefore = await token.balanceOf(owner.address);
-    await expect(airdrop.connect(owner).withdraw(roundId, owner.address))
-      .to.emit(airdrop, "Withdrawn")
-      .withArgs(roundId, owner.address, totalAllocation);
+    await airdrop.connect(owner).withdraw(roundId, owner.address);
 
-    expect(await token.balanceOf(owner.address)).to.equal(ownerBefore + totalAllocation);
+    expect(await token.balanceOf(owner.address)).to.equal(ownerBefore + contractFunding);
   });
 
   it("exposes accurate eligibility info", async function () {
@@ -303,7 +267,7 @@ describe("Airdrop", function () {
     const amount = claims.find(([wallet]) => wallet === alice.address)![1];
     const proof = proofFor(tree, leaves, alice.address, amount);
     await time.increaseTo(startTime);
-    const [isEligible, canClaim] = await airdrop.checkEligibility(
+    const [isEligible, canClaim, claimed] = await airdrop.checkEligibility(
       roundId,
       alice.address,
       amount,
@@ -312,6 +276,13 @@ describe("Airdrop", function () {
 
     expect(isEligible).to.be.true;
     expect(canClaim).to.be.true;
+    expect(claimed).to.be.false;
+
+    await airdrop.connect(alice).claim(roundId, amount, proof);
+    const [, canClaimAfterClaim, claimedAfterClaim] =
+      await airdrop.checkEligibility(roundId, alice.address, amount, proof);
+    expect(canClaimAfterClaim).to.be.false;
+    expect(claimedAfterClaim).to.be.true;
 
     const outsiderProof = proofFor(tree, leaves, claims[0][0], claims[0][1]);
     const [isEligibleOutsider] = await airdrop.checkEligibility(

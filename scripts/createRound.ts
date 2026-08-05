@@ -7,7 +7,6 @@ async function main() {
   const merkleRootInput = "0xe41f2544f5ebf2979f6425f2f737efe0ed2b90a6da5cfe7992799785da8b49f3";
   const claimStartTimeInput = 1786010485;
   const claimEndTimeInput = 1786784485;
-  const suppliedAmount = "1000000000000000000000";  //1000
   const maxClaimPerAccountInput = "100000000000000000000"; //100
 
   if (!airdropAddress || !ethers.isAddress(airdropAddress)) {
@@ -28,22 +27,16 @@ async function main() {
   
   const airdrop = await ethers.getContractAt("Airdrop", airdropAddress, signer);
   const tokenAddress = await airdrop.token();
-  const token = await ethers.getContractAt("IERC20", tokenAddress, signer);
 
   console.log(`Using signer: ${signer.address}`);
   console.log(`Airdrop: ${airdropAddress}`);
   console.log(`Token: ${tokenAddress}`);
-  console.log(`Creating round: root=${merkleRootInput}, start=${claimStartTimeInput}, end=${claimEndTimeInput}, supplied=${suppliedAmount}, maxClaimPerAccount=${claimStartTimeInput}`);
-  
-  const approveTx = await token.approve(airdropAddress, suppliedAmount);
-  console.log("Approve tx sent:", approveTx.hash);
-  await approveTx.wait();
+  console.log(`Creating round: root=${merkleRootInput}, start=${claimStartTimeInput}, end=${claimEndTimeInput}, maxClaimPerAccount=${maxClaimPerAccountInput}`);
 
   const tx = await airdrop.createRound(
     ethers.getBytes(merkleRootInput),
     claimStartTimeInput,
     claimEndTimeInput,
-    suppliedAmount,
     maxClaimPerAccountInput
   );
   console.log("Create round tx sent:", tx.hash);
