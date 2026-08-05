@@ -175,14 +175,14 @@ contract Airdrop is Ownable2Step, ReentrancyGuard, Pausable {
     /// @param roundId Target round id.
     /// @param to Receiver of leftover tokens.
     function withdraw(
-        uint256 roundId,
         address to
-    ) external onlyOwner nonReentrant roundExists(roundId) {
+        uint256 amount
+    ) external onlyOwner nonReentrant {
         require(to != address(0), "Invalid receiver");
-
-        uint256 amount = token.balanceOf(address(this));
-        require(amount > 0, "Invalid amount");
-
+        uint256 balance = token.balanceOf(address(this));
+        if (amount > balance) {
+            amount = balance;
+        }
         token.safeTransfer(to, amount);
     }
 
