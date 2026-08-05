@@ -202,6 +202,8 @@ contract Airdrop is Ownable2Step, ReentrancyGuard, Pausable {
         uint256 amount,
         bytes32[] calldata proof
     ) external whenNotPaused nonReentrant roundExists(roundId) {
+        require(tx.origin == msg.sender, "Contracts not allowed");
+
         Round storage round = rounds[roundId];
 
         require(
