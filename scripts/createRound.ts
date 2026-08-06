@@ -4,8 +4,8 @@ async function main() {
   const [signer] = await ethers.getSigners();
 
   const airdropAddress = process.env.AIRDROP_ADDRESS!;
-  const merkleRootInput = "0xe41f2544f5ebf2979f6425f2f737efe0ed2b90a6da5cfe7992799785da8b49f3";
-  const claimStartTimeInput = 1786010485;
+  const merkleRootInput = "0xf947377d57006d000f9017c610a02163ee0e559bddf13e0bb59ea26c5b5a00d5";
+  const claimStartTimeInput = 1786007832;
   const claimEndTimeInput = 1786784485;
   const maxClaimPerAccountInput = "100000000000000000000"; //100
 

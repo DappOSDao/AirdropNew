@@ -1,15 +1,12 @@
 import { ethers } from "hardhat";
 
-function getRoundId(): bigint {
-  return BigInt(process.env.ROUND_ID ?? "0");
-}
 
 async function main() {
   const [signer] = await ethers.getSigners();
 
   const airdropAddress = process.env.AIRDROP_ADDRESS!;
-  const roundId = getRoundId();
-  const merkleRootInput = process.env.MERKLE_ROOT ?? "0x8ed5d108764ebbf72356e845af769e2bef7b6511809fbad87047d518f2fa8770";
+  const roundId = 2
+  const merkleRootInput = "0xf947377d57006d000f9017c610a02163ee0e559bddf13e0bb59ea26c5b5a00d5";
 
   if (!airdropAddress || !ethers.isAddress(airdropAddress)) {
     throw new Error("Missing or invalid AIRDROP_ADDRESS env value.");

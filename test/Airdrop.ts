@@ -232,11 +232,11 @@ describe("Airdrop", function () {
   });
 
   it("lets owner withdraw round leftovers before the deadline", async function () {
-    const { airdrop, owner, token, roundId, contractFunding } =
+    const { airdrop, owner, token, contractFunding } =
       await loadFixture(deployFixture);
 
     const ownerBefore = await token.balanceOf(owner.address);
-    await airdrop.connect(owner).withdraw(roundId, owner.address);
+    await airdrop.connect(owner).withdraw(owner.address, contractFunding);
 
     expect(await token.balanceOf(owner.address)).to.equal(ownerBefore + contractFunding);
   });
@@ -255,7 +255,7 @@ describe("Airdrop", function () {
     ).to.be.revertedWith("Invalid claim time");
 
     const ownerBefore = await token.balanceOf(owner.address);
-    await airdrop.connect(owner).withdraw(roundId, owner.address);
+    await airdrop.connect(owner).withdraw(owner.address, contractFunding);
 
     expect(await token.balanceOf(owner.address)).to.equal(ownerBefore + contractFunding);
   });
