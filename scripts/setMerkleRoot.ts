@@ -6,7 +6,7 @@ async function main() {
 
   const airdropAddress = process.env.AIRDROP_ADDRESS!;
   const roundId = 2
-  const merkleRootInput = "0xf947377d57006d000f9017c610a02163ee0e559bddf13e0bb59ea26c5b5a00d5";
+  const merkleRootInput = "0x90e0e835544de21f93fda3d767b069c9120c2dba2b9eb52be65ef833538c1269";
 
   if (!airdropAddress || !ethers.isAddress(airdropAddress)) {
     throw new Error("Missing or invalid AIRDROP_ADDRESS env value.");

@@ -100,6 +100,90 @@ describe("Airdrop", function () {
     expect(await token.balanceOf(alice.address)).to.equal(amount);
   });
 
+
+  it("claimAndStake restakes instead of transferring when restaking address is set", async function () {
+    const [owner, alice] = await ethers.getSigners();
+    const amount = ethers.parseEther("100");
+    const leaves = [
+      ethers.solidityPackedKeccak256(["address", "uint256"], [alice.address, amount]),
+    ];
+    const tree = SimpleMerkleTree.of(leaves);
+
+    const token = await ethers.deployContract("MockERC20");
+    await token.waitForDeployment();
+
+    const restaking = await ethers.deployContract("MockRestaking", [token.target]);
+    await restaking.waitForDeployment();
+
+    const airdrop = await ethers.deployContract("Airdrop", [
+      token.target,
+    ]);
+    await airdrop.waitForDeployment();
+    await airdrop.setRestaking(restaking.target);
+
+    await token.mint(owner.address, amount);
+    await token.transfer(airdrop.target, amount);
+
+    const startTime = (await time.latest()) + 60;
+    const deadline = startTime + 3600;
+    await airdrop.createRound(tree.root, startTime, deadline, amount);
+    await time.increaseTo(startTime);
+
+    await airdrop.connect(alice).claimAndStake(0, amount, tree.getProof(0));
+
+    expect(await token.balanceOf(alice.address)).to.equal(0);
+    expect(await token.balanceOf(restaking.target)).to.equal(amount);
+    expect(await restaking.restakedAmount(0, alice.address)).to.equal(amount);
+    expect(await token.allowance(airdrop.target, restaking.target)).to.equal(0);
+  });
+
+
+  it("claim still transfers directly even when restaking address is set", async function () {
+    const [owner, alice] = await ethers.getSigners();
+    const amount = ethers.parseEther("100");
+    const leaves = [
+      ethers.solidityPackedKeccak256(["address", "uint256"], [alice.address, amount]),
+    ];
+    const tree = SimpleMerkleTree.of(leaves);
+
+    const token = await ethers.deployContract("MockERC20");
+    await token.waitForDeployment();
+
+    const restaking = await ethers.deployContract("MockRestaking", [token.target]);
+    await restaking.waitForDeployment();
+
+    const airdrop = await ethers.deployContract("Airdrop", [token.target]);
+    await airdrop.waitForDeployment();
+    await airdrop.setRestaking(restaking.target);
+
+    await token.mint(owner.address, amount);
+    await token.transfer(airdrop.target, amount);
+
+    const startTime = (await time.latest()) + 60;
+    const deadline = startTime + 3600;
+    await airdrop.createRound(tree.root, startTime, deadline, amount);
+    await time.increaseTo(startTime);
+
+    await airdrop.connect(alice).claim(0, amount, tree.getProof(0));
+
+    expect(await token.balanceOf(alice.address)).to.equal(amount);
+    expect(await token.balanceOf(restaking.target)).to.equal(0);
+    expect(await restaking.restakedAmount(0, alice.address)).to.equal(0);
+  });
+
+  it("claimAndStake reverts when restaking address is unset", async function () {
+    const { airdrop, alice, claims, tree, leaves, startTime, roundId } = await loadFixture(
+      deployFixture
+    );
+    const amount = claims.find(([wallet]) => wallet === alice.address)![1];
+    const proof = proofFor(tree, leaves, alice.address, amount);
+    await time.increaseTo(startTime);
+
+    await expect(
+      airdrop.connect(alice).claimAndStake(roundId, amount, proof)
+    ).to.be.revertedWith("Restaking unset");
+  });
+
   it("blocks repeated claims from the same wallet in the same round", async function () {
     const { airdrop, alice, claims, tree, leaves, startTime, roundId } = await loadFixture(
       deployFixture

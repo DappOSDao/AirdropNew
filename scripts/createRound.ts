@@ -4,10 +4,10 @@ async function main() {
   const [signer] = await ethers.getSigners();
 
   const airdropAddress = process.env.AIRDROP_ADDRESS!;
-  const merkleRootInput = "0xf947377d57006d000f9017c610a02163ee0e559bddf13e0bb59ea26c5b5a00d5";
-  const claimStartTimeInput = 1786007832;
-  const claimEndTimeInput = 1786784485;
-  const maxClaimPerAccountInput = "100000000000000000000"; //100
+  const merkleRootInput = "0x90e0e835544de21f93fda3d767b069c9120c2dba2b9eb52be65ef833538c1269";
+  const claimStartTimeInput = 1787558400;
+  const claimEndTimeInput = 1787727941;
+  const maxClaimPerAccountInput = "20000000000000000000000"; //20000
 
   if (!airdropAddress || !ethers.isAddress(airdropAddress)) {
     throw new Error("Missing or invalid AIRDROP_ADDRESS env value.");

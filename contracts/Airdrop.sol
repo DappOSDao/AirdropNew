@@ -11,11 +11,22 @@ import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 /// @title Airdrop
 /// @notice Supports multiple ERC20 airdrop rounds in one contract. Each round has
 ///         an independent Merkle root, claim deadline and claimed state.
+interface IRestaking {
+    function restake(
+        uint256 roundId,
+        address user,
+        uint256 amount
+    ) external returns (uint256 id);
+}
+
 contract Airdrop is Ownable2Step, ReentrancyGuard, Pausable {
     using SafeERC20 for IERC20;
 
     /// @notice ERC20 token distributed by all rounds in this contract.
     IERC20 public immutable token;
+
+    /// @notice Optional restaking contract used instead of direct transfers when set.
+    IRestaking public restaking;
 
     struct Round {
         bytes32 merkleRoot;
@@ -42,6 +53,7 @@ contract Airdrop is Ownable2Step, ReentrancyGuard, Pausable {
         uint256 maxClaimPerAccount
     );
     event MerkleRootSet(uint256 indexed roundId, bytes32 indexed root);
+    event RestakingSet(address indexed restaking);
     /// @notice Initialize the contract and bind the ERC20 that will be distributed.
     /// @param tokenAddr ERC20 token distributed by this contract.
     constructor(address tokenAddr) Ownable(msg.sender) {
@@ -52,6 +64,13 @@ contract Airdrop is Ownable2Step, ReentrancyGuard, Pausable {
     modifier roundExists(uint256 roundId) {
         require(rounds[roundId].exists, "Round not found");
         _;
+    }
+
+    /// @notice Set optional restaking contract. Use zero address to disable restaking.
+    /// @param restakingAddr Restaking contract address, or zero for direct transfers.
+    function setRestaking(address restakingAddr) external onlyOwner {
+        restaking = IRestaking(restakingAddr);
+        emit RestakingSet(restakingAddr);
     }
 
     /// @notice Create a new airdrop round.
@@ -115,6 +134,32 @@ contract Airdrop is Ownable2Step, ReentrancyGuard, Pausable {
         uint256 amount,
         bytes32[] calldata proof
     ) external whenNotPaused nonReentrant roundExists(roundId) {
+        _claim(roundId, amount, proof);
+        token.safeTransfer(msg.sender, amount);
+    }
+
+    /// @notice Claim tokens and stake them through the configured restaking contract.
+    /// @param roundId Target round id.
+    /// @param amount Exact amount encoded for the caller.
+    /// @param proof Merkle branch that proves inclusion.
+    function claimAndStake(
+        uint256 roundId,
+        uint256 amount,
+        bytes32[] calldata proof
+    ) external whenNotPaused nonReentrant roundExists(roundId) {
+        require(address(restaking) != address(0), "Restaking unset");
+
+        _claim(roundId, amount, proof);
+        token.forceApprove(address(restaking), amount);
+        restaking.restake(roundId, msg.sender, amount);
+        token.forceApprove(address(restaking), 0);
+    }
+
+    function _claim(
+        uint256 roundId,
+        uint256 amount,
+        bytes32[] calldata proof
+    ) internal {
         Round storage round = rounds[roundId];
 
         require(
@@ -132,8 +177,6 @@ contract Airdrop is Ownable2Step, ReentrancyGuard, Pausable {
         require(isValidProof, "Invalid proof");
 
         hasClaimed[roundId][msg.sender] = true;
-
-        token.safeTransfer(msg.sender, amount);
     }
 
     /// @notice View helper to check a proof and operational constraints for a round.

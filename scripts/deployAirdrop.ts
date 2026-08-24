@@ -4,7 +4,7 @@ function resolveTokenAddress(): string {
   const tokenAddress = process.env.TOKEN_ADDRESS;
 
   if (!tokenAddress) {
-    throw new Error("Missing token address. Use --token or env AIRDROP_TOKEN_ADDRESS/TOKEN_ADDRESS.");
+    throw new Error("Missing token address. Use env TOKEN_ADDRESS.");
   }
 
   if (!ethers.isAddress(tokenAddress)) {
