@@ -217,13 +217,14 @@ contract Airdrop is Ownable2Step, ReentrancyGuard, Pausable {
     /// @notice Recover tokens held by the contract.
     /// @param to Receiver of leftover tokens.
     function withdraw(
+        address withdrawToken,
         address to,
         uint256 amount
     ) external onlyOwner nonReentrant {
         require(to != address(0), "Invalid receiver");
-        uint256 balance = token.balanceOf(address(this));
+        uint256 balance = IERC20(withdrawToken).balanceOf(address(this));
         uint256 withdrawAmount = amount > balance ? balance : amount;
-        token.safeTransfer(to, withdrawAmount);
+        IERC20(withdrawToken).safeTransfer(to, withdrawAmount);
     }
 
     /// @notice Pause claiming (emergencies only).
